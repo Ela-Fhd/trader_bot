@@ -1,0 +1,569 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1>استراتژی‌های معاملاتی</h1>
+        <p class="text-muted">تعریف و مدیریت استراتژی‌های معاملاتی خودکار</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <!-- Strategy Creation Form -->
+        <div class="card">
+            <div class="card-header">
+                ایجاد استراتژی جدید
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('strategy') }}">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">نام استراتژی</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">توضیحات</label>
+                        <textarea class="form-control" id="description" name="description" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="trading_pair_id" class="form-label">جفت ارزی</label>
+                        <select class="form-select" id="trading_pair_id" name="trading_pair_id" required>
+                            <option value="" selected disabled>انتخاب کنید</option>
+                            {% for pair in trading_pairs %}
+                            <option value="{{ pair.id }}">{{ pair.symbol }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="strategy_type" class="form-label">نوع استراتژی</label>
+                        <select class="form-select" id="strategy_type" name="strategy_type" required>
+                            <option value="" selected disabled>انتخاب کنید</option>
+                            {% for strategy in available_strategies %}
+                            <option value="{{ strategy.id }}">{{ strategy.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div id="strategy_parameters">
+                        <!-- Parameters will be loaded here dynamically -->
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="is_active" name="is_active" checked>
+                        <label class="form-check-label" for="is_active">فعال</label>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">ذخیره استراتژی</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <!-- Existing Strategies -->
+        <div class="card">
+            <div class="card-header">
+                استراتژی‌های موجود
+            </div>
+            <div class="card-body">
+                {% if existing_strategies %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>نام</th>
+                                <th>جفت ارزی</th>
+                                <th>نوع</th>
+                                <th>وضعیت</th>
+                                <th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for strategy in existing_strategies %}
+                            <tr>
+                                <td>{{ strategy.name }}</td>
+                                <td>{{ strategy.trading_pair.symbol }}</td>
+                                <td>{{ strategy.strategy_type }}</td>
+                                <td>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input strategy-toggle" 
+                                               type="checkbox" 
+                                               role="switch" 
+                                               data-id="{{ strategy.id }}" 
+                                               {{ 'checked' if strategy.is_active else '' }}>
+                                    </div>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-1 view-strategy" 
+                                            data-id="{{ strategy.id }}">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger delete-strategy" 
+                                            data-id="{{ strategy.id }}" 
+                                            data-name="{{ strategy.name }}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center my-4">هنوز استراتژی‌ای تعریف نشده است</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Strategy Analysis -->
+        <div class="card mt-4" id="strategy-analysis" style="display: none;">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>تحلیل استراتژی: <span id="strategy-name"></span></div>
+                    <button class="btn btn-sm btn-outline-secondary" id="close-analysis">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5 class="card-title">سیگنال فعلی</h5>
+                                <p class="card-text">
+                                    <span id="current-signal" class="badge bg-secondary fs-5">در حال تحلیل...</span>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title">پارامترها</h5>
+                                <div id="strategy-parameters">
+                                    <!-- Parameters will be displayed here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-8">
+                        <div style="height: 300px;">
+                            <canvas id="strategyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">تأیید حذف</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                آیا از حذف استراتژی "<span id="strategy-to-delete"></span>" اطمینان دارید؟
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+                <form id="delete-form" method="POST">
+                    <button type="submit" class="btn btn-danger">حذف</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/strategy.js') }}"></script>
+<script>
+    // Available strategies data
+    const availableStrategies = {{ available_strategies|tojson }};
+    
+    // Handle strategy type selection
+    $('#strategy_type').change(function() {
+        const strategyId = $(this).val();
+        updateStrategyParameters(strategyId);
+    });
+    
+    // Update strategy parameters form
+    function updateStrategyParameters(strategyId) {
+        const parametersContainer = $('#strategy_parameters');
+        parametersContainer.empty();
+        
+        if (!strategyId) return;
+        
+        const strategy = availableStrategies.find(s => s.id === strategyId);
+        if (!strategy) return;
+        
+        // Create input fields for each parameter
+        for (const [paramName, paramInfo] of Object.entries(strategy.parameters)) {
+            const inputId = `param_${paramName}`;
+            
+            let inputHtml = `
+                <div class="mb-3">
+                    <label for="${inputId}" class="form-label">${paramInfo.description}</label>
+            `;
+            
+            if (paramInfo.type === 'bool') {
+                inputHtml += `
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="${inputId}" name="${paramName}" ${paramInfo.default ? 'checked' : ''}>
+                        <label class="form-check-label" for="${inputId}">فعال</label>
+                    </div>
+                `;
+            } else {
+                const min = paramInfo.min !== undefined ? `min="${paramInfo.min}"` : '';
+                const max = paramInfo.max !== undefined ? `max="${paramInfo.max}"` : '';
+                const step = paramInfo.type === 'float' ? 'step="0.1"' : '';
+                
+                inputHtml += `
+                    <input type="${paramInfo.type === 'int' || paramInfo.type === 'float' ? 'number' : 'text'}" 
+                           class="form-control" 
+                           id="${inputId}" 
+                           name="${paramName}" 
+                           value="${paramInfo.default}" 
+                           ${min} ${max} ${step}
+                           required>
+                `;
+            }
+            
+            inputHtml += `</div>`;
+            parametersContainer.append(inputHtml);
+        }
+    }
+    
+    // Toggle strategy active status
+    $('.strategy-toggle').change(function() {
+        const id = $(this).data('id');
+        const checkbox = $(this);
+        
+        $.ajax({
+            url: `/strategy/${id}/toggle`,
+            type: 'POST',
+            success: function(response) {
+                if (!response.success) {
+                    // Reset checkbox to previous state
+                    checkbox.prop('checked', !checkbox.prop('checked'));
+                    alert('خطا در تغییر وضعیت استراتژی');
+                }
+            },
+            error: function() {
+                // Reset checkbox to previous state
+                checkbox.prop('checked', !checkbox.prop('checked'));
+                alert('خطا در تغییر وضعیت استراتژی');
+            }
+        });
+    });
+    
+    // Show delete confirmation modal
+    $('.delete-strategy').click(function() {
+        const id = $(this).data('id');
+        const name = $(this).data('name');
+        
+        $('#strategy-to-delete').text(name);
+        $('#delete-form').attr('action', `/strategy/${id}/delete`);
+        
+        const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        deleteModal.show();
+    });
+    
+    // Strategy analysis
+    let strategyChart;
+    
+    $('.view-strategy').click(function() {
+        const id = $(this).data('id');
+        
+        // Show the analysis panel
+        $('#strategy-analysis').show();
+        $('#strategy-name').text('در حال بارگذاری...');
+        $('#current-signal').text('در حال تحلیل...').removeClass().addClass('badge bg-secondary fs-5');
+        $('#strategy-parameters').empty();
+        
+        // Fetch strategy analysis
+        $.ajax({
+            url: `/api/analyze_strategy/${id}`,
+            type: 'GET',
+            data: {
+                timeframe: '1h',
+                limit: 100
+            },
+            success: function(response) {
+                if (response.success) {
+                    const data = response.data;
+                    
+                    // Update strategy name
+                    $('#strategy-name').text(data.strategy_name + ' (' + data.trading_pair + ')');
+                    
+                    // Update signal
+                    const signalEl = $('#current-signal');
+                    signalEl.text(data.signal);
+                    
+                    if (data.signal === 'BUY') {
+                        signalEl.removeClass().addClass('badge bg-success fs-5');
+                    } else if (data.signal === 'SELL') {
+                        signalEl.removeClass().addClass('badge bg-danger fs-5');
+                    } else {
+                        signalEl.removeClass().addClass('badge bg-secondary fs-5');
+                    }
+                    
+                    // Update parameters
+                    const paramsEl = $('#strategy-parameters');
+                    paramsEl.empty();
+                    
+                    for (const [key, value] of Object.entries(data)) {
+                        // Filter out non-parameter fields and arrays
+                        if (!['signal', 'strategy_name', 'trading_pair', 'timeframe', 'error'].includes(key) && 
+                            !Array.isArray(value) && typeof value !== 'object') {
+                            paramsEl.append(`
+                                <div class="mb-1">
+                                    <strong>${key}:</strong> ${value}
+                                </div>
+                            `);
+                        }
+                    }
+                    
+                    // Update chart
+                    updateStrategyChart(data);
+                    
+                } else {
+                    $('#strategy-name').text('خطا در تحلیل');
+                    $('#current-signal').text('خطا').removeClass().addClass('badge bg-danger fs-5');
+                    alert('خطا در تحلیل استراتژی: ' + response.error);
+                }
+            },
+            error: function() {
+                $('#strategy-name').text('خطا در تحلیل');
+                $('#current-signal').text('خطا').removeClass().addClass('badge bg-danger fs-5');
+                alert('خطا در تحلیل استراتژی');
+            }
+        });
+    });
+    
+    // Close analysis panel
+    $('#close-analysis').click(function() {
+        $('#strategy-analysis').hide();
+        if (strategyChart) {
+            strategyChart.destroy();
+        }
+    });
+    
+    // Update strategy chart
+    function updateStrategyChart(data) {
+        // If chart exists, destroy it
+        if (strategyChart) {
+            strategyChart.destroy();
+        }
+        
+        const ctx = document.getElementById('strategyChart').getContext('2d');
+        
+        // Determine what data to display based on strategy type
+        let datasets = [];
+        let labels = [];
+        
+        // Sample price data for demonstration
+        const prices = Array(30).fill(0).map((_, i) => 30000 - i * 100 + Math.random() * 500);
+        labels = Array(30).fill(0).map((_, i) => `Day ${30-i}`);
+        
+        datasets.push({
+            label: 'Price',
+            data: prices,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+            fill: true,
+            tension: 0.4,
+            yAxisID: 'y'
+        });
+        
+        // Add indicators based on data
+        if (data.fast_ma && data.slow_ma) {
+            // MA Crossover strategy
+            const fastMa = data.fast_ma.slice(-30);
+            const slowMa = data.slow_ma.slice(-30);
+            
+            datasets.push({
+                label: 'Fast MA',
+                data: fastMa,
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                pointRadius: 0,
+                yAxisID: 'y'
+            });
+            
+            datasets.push({
+                label: 'Slow MA',
+                data: slowMa,
+                borderColor: 'rgba(54, 162, 235, 1)',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                pointRadius: 0,
+                yAxisID: 'y'
+            });
+            
+        } else if (data.rsi) {
+            // RSI strategy
+            const rsi = data.rsi.slice(-30);
+            
+            datasets.push({
+                label: 'RSI',
+                data: rsi,
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                yAxisID: 'y1'
+            });
+            
+            // Add oversold/overbought lines
+            datasets.push({
+                label: 'Overbought',
+                data: Array(30).fill(70),
+                borderColor: 'rgba(255, 0, 0, 0.5)',
+                borderDash: [5, 5],
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                pointRadius: 0,
+                yAxisID: 'y1'
+            });
+            
+            datasets.push({
+                label: 'Oversold',
+                data: Array(30).fill(30),
+                borderColor: 'rgba(0, 255, 0, 0.5)',
+                borderDash: [5, 5],
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                pointRadius: 0,
+                yAxisID: 'y1'
+            });
+            
+        } else if (data.macd_line && data.signal_line) {
+            // MACD strategy
+            const macdLine = data.macd_line.slice(-30);
+            const signalLine = data.signal_line.slice(-30);
+            const histogram = data.histogram.slice(-30);
+            
+            datasets.push({
+                label: 'MACD',
+                data: macdLine,
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                yAxisID: 'y1'
+            });
+            
+            datasets.push({
+                label: 'Signal',
+                data: signalLine,
+                borderColor: 'rgba(54, 162, 235, 1)',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                yAxisID: 'y1'
+            });
+            
+            // Add histogram as bar chart
+            datasets.push({
+                label: 'Histogram',
+                data: histogram,
+                backgroundColor: histogram.map(val => val >= 0 ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)'),
+                borderColor: histogram.map(val => val >= 0 ? 'rgba(0, 255, 0, 1)' : 'rgba(255, 0, 0, 1)'),
+                borderWidth: 1,
+                type: 'bar',
+                yAxisID: 'y1'
+            });
+            
+        } else if (data.upper_band && data.lower_band) {
+            // Bollinger Bands strategy
+            const upperBand = data.upper_band.slice(-30);
+            const middleBand = data.middle_band.slice(-30);
+            const lowerBand = data.lower_band.slice(-30);
+            
+            datasets.push({
+                label: 'Upper Band',
+                data: upperBand,
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                pointRadius: 0,
+                yAxisID: 'y'
+            });
+            
+            datasets.push({
+                label: 'Middle Band',
+                data: middleBand,
+                borderColor: 'rgba(54, 162, 235, 1)',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                pointRadius: 0,
+                yAxisID: 'y'
+            });
+            
+            datasets.push({
+                label: 'Lower Band',
+                data: lowerBand,
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                pointRadius: 0,
+                yAxisID: 'y'
+            });
+        }
+        
+        strategyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Price'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: data.rsi || (data.macd_line && data.signal_line),
+                        position: 'right',
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                        title: {
+                            display: true,
+                            text: data.rsi ? 'RSI' : 'MACD'
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

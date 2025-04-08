@@ -1,0 +1,136 @@
+/* Custom styles for CoinEx Trading Bot */
+
+/* 
+  Right-to-left (RTL) support for Persian language
+  This ensures content is properly aligned for Persian text
+*/
+body {
+    direction: rtl;
+    text-align: right;
+}
+
+/* Fix for Bootstrap components in RTL mode */
+.navbar-nav {
+    padding-right: 0;
+}
+
+/* Styling for navbar links */
+.nav-link {
+    color: white !important;
+}
+
+.nav-link.active {
+    color: #ff69b4 !important; /* Hot pink for active menu items */
+    font-weight: bold;
+}
+
+.form-check {
+    padding-right: 1.5em;
+    padding-left: 0;
+}
+
+.form-check .form-check-input {
+    float: right;
+    margin-right: -1.5em;
+    margin-left: 0;
+}
+
+.btn-close {
+    margin-left: 0;
+    margin-right: auto;
+}
+
+.dropdown-menu {
+    text-align: right;
+}
+
+/* Cards with fixed height for dashboard */
+.dashboard-card {
+    height: 100%;
+    min-height: 180px;
+}
+
+/* Custom styles for strategy analysis */
+.signal-badge {
+    font-size: 1.2rem;
+    padding: 0.5rem 1rem;
+}
+
+/* Custom styles for charts */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Custom tooltips for information */
+.info-tooltip {
+    cursor: help;
+    color: rgba(var(--bs-info-rgb), var(--bs-text-opacity)) !important;
+}
+
+/* Trading pair badges */
+.badge-trading-pair {
+    font-size: 0.9rem;
+    font-weight: normal;
+    padding: 0.35rem 0.65rem;
+}
+
+/* Custom styles for toggle switches */
+.form-switch .form-check-input {
+    height: 1.5em;
+    width: 3em;
+}
+
+/* Status indicators */
+.status-active {
+    color: var(--bs-success);
+}
+
+.status-inactive {
+    color: var(--bs-danger);
+}
+
+/* Strategy card hover effect */
+.strategy-card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.strategy-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Custom padding for main content */
+main {
+    padding-bottom: 2rem;
+}
+
+/* Custom styles for the strategy parameters form */
+.strategy-parameter {
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Media query for mobile responsiveness */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .display-4 {
+        font-size: 2rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.85rem;
+    }
+}
+
+/* Pink color for navbar brand */
+.navbar-brand {
+    color: #ff69b4 !important;
+    font-weight: bold;
+}

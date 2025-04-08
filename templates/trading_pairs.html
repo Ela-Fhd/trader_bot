@@ -1,0 +1,428 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1>مدیریت جفت‌های ارزی</h1>
+        <p class="text-muted">افزودن و مدیریت جفت‌های ارزی برای معامله</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <!-- Add Trading Pair Form -->
+        <div class="card">
+            <div class="card-header">
+                افزودن جفت ارزی جدید
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('trading_pairs') }}">
+                    <div class="mb-3">
+                        <label for="symbol" class="form-label">نماد</label>
+                        <input type="text" class="form-control" id="symbol" name="symbol" placeholder="مثال: BTC/USDT" required>
+                        <div class="form-text">نماد باید به فرمت BASE/QUOTE باشد (مثلاً BTC/USDT)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="base_currency" class="form-label">ارز پایه</label>
+                        <input type="text" class="form-control" id="base_currency" name="base_currency" placeholder="مثال: BTC" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="quote_currency" class="form-label">ارز نقل</label>
+                        <input type="text" class="form-control" id="quote_currency" name="quote_currency" placeholder="مثال: USDT" required>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">افزودن جفت ارزی</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Popular Markets Card -->
+        <div class="card mt-3">
+            <div class="card-header">
+                بازارهای محبوب
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <button type="button" class="list-group-item list-group-item-action quick-add" 
+                            data-symbol="BTC/USDT" data-base="BTC" data-quote="USDT">
+                        BTC/USDT (بیتکوین/تتر)
+                    </button>
+                    <button type="button" class="list-group-item list-group-item-action quick-add" 
+                            data-symbol="ETH/USDT" data-base="ETH" data-quote="USDT">
+                        ETH/USDT (اتریوم/تتر)
+                    </button>
+                    <button type="button" class="list-group-item list-group-item-action quick-add" 
+                            data-symbol="SOL/USDT" data-base="SOL" data-quote="USDT">
+                        SOL/USDT (سولانا/تتر)
+                    </button>
+                    <button type="button" class="list-group-item list-group-item-action quick-add" 
+                            data-symbol="ETH/BTC" data-base="ETH" data-quote="BTC">
+                        ETH/BTC (اتریوم/بیتکوین)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8 mb-4">
+        <!-- Existing Trading Pairs -->
+        <div class="card">
+            <div class="card-header">
+                جفت‌های ارزی موجود
+            </div>
+            <div class="card-body">
+                {% if existing_pairs %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>نماد</th>
+                                <th>ارز پایه</th>
+                                <th>ارز نقل</th>
+                                <th>وضعیت</th>
+                                <th>تاریخ افزودن</th>
+                                <th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pair in existing_pairs %}
+                            <tr>
+                                <td>{{ pair.symbol }}</td>
+                                <td>{{ pair.base_currency }}</td>
+                                <td>{{ pair.quote_currency }}</td>
+                                <td>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input pair-toggle" 
+                                               type="checkbox" 
+                                               role="switch" 
+                                               data-id="{{ pair.id }}" 
+                                               {{ 'checked' if pair.is_active else '' }}>
+                                    </div>
+                                </td>
+                                <td>{{ pair.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info view-market-data" 
+                                            data-symbol="{{ pair.symbol }}">
+                                        <i class="fas fa-chart-line"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center my-4">هیچ جفت ارزی تعریف نشده است</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Available Markets from CoinEx -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>بازارهای موجود در کوینکس</div>
+                    <input type="text" class="form-control form-control-sm w-25" id="marketSearch" placeholder="جستجو...">
+                </div>
+            </div>
+            <div class="card-body">
+                {% if markets %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover" id="marketsTable">
+                        <thead>
+                            <tr>
+                                <th>نماد</th>
+                                <th>ارز پایه</th>
+                                <th>ارز نقل</th>
+                                <th>وضعیت</th>
+                                <th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for market in markets %}
+                            <tr>
+                                <td>{{ market.symbol }}</td>
+                                <td>{{ market.base }}</td>
+                                <td>{{ market.quote }}</td>
+                                <td>
+                                    {% if market.active %}
+                                    <span class="badge bg-success">فعال</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">غیرفعال</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary quick-add-market" 
+                                            data-symbol="{{ market.symbol }}" 
+                                            data-base="{{ market.base }}" 
+                                            data-quote="{{ market.quote }}">
+                                        <i class="fas fa-plus"></i> افزودن
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    برای مشاهده بازارهای کوینکس، باید API را پیکربندی کنید.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Market Data Modal -->
+<div class="modal fade" id="marketDataModal" tabindex="-1" aria-labelledby="marketDataModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="marketDataModalLabel">داده‌های بازار</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between mb-3">
+                    <div>
+                        <h5 id="modalSymbol">نماد: BTC/USDT</h5>
+                    </div>
+                    <div class="btn-group" role="group" aria-label="Timeframe selection">
+                        <button type="button" class="btn btn-sm btn-outline-primary active" data-timeframe="1h">1 ساعت</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-timeframe="4h">4 ساعت</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-timeframe="1d">روزانه</button>
+                    </div>
+                </div>
+                
+                <div style="height: 400px;">
+                    <canvas id="marketChart"></canvas>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">قیمت</div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <span>آخرین قیمت:</span>
+                                    <span id="lastPrice">0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>تغییر 24 ساعته:</span>
+                                    <span id="change24h">0.00%</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>بالاترین 24 ساعته:</span>
+                                    <span id="high24h">0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>پایین‌ترین 24 ساعته:</span>
+                                    <span id="low24h">0.00</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">حجم</div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <span>حجم 24 ساعته:</span>
+                                    <span id="volume24h">0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>تعداد معاملات امروز:</span>
+                                    <span id="tradesCount">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">بستن</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Toggle trading pair active status
+    $('.pair-toggle').change(function() {
+        const id = $(this).data('id');
+        const checkbox = $(this);
+        
+        $.ajax({
+            url: `/trading_pairs/${id}/toggle`,
+            type: 'POST',
+            success: function(response) {
+                if (!response.success) {
+                    // Reset checkbox to previous state
+                    checkbox.prop('checked', !checkbox.prop('checked'));
+                    alert('خطا در تغییر وضعیت جفت ارزی');
+                }
+            },
+            error: function() {
+                // Reset checkbox to previous state
+                checkbox.prop('checked', !checkbox.prop('checked'));
+                alert('خطا در تغییر وضعیت جفت ارزی');
+            }
+        });
+    });
+    
+    // Quick add from popular markets
+    $('.quick-add').click(function() {
+        $('#symbol').val($(this).data('symbol'));
+        $('#base_currency').val($(this).data('base'));
+        $('#quote_currency').val($(this).data('quote'));
+    });
+    
+    // Quick add from CoinEx markets
+    $('.quick-add-market').click(function() {
+        $('#symbol').val($(this).data('symbol'));
+        $('#base_currency').val($(this).data('base'));
+        $('#quote_currency').val($(this).data('quote'));
+        
+        // Scroll to the form
+        $('html, body').animate({
+            scrollTop: $("#symbol").offset().top - 100
+        }, 500);
+    });
+    
+    // Search markets
+    $('#marketSearch').on('keyup', function() {
+        const value = $(this).val().toLowerCase();
+        $('#marketsTable tbody tr').filter(function() {
+            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+        });
+    });
+    
+    // View market data
+    let marketChart;
+    let currentSymbol;
+    let currentTimeframe = '1h';
+    
+    $('.view-market-data').click(function() {
+        currentSymbol = $(this).data('symbol');
+        $('#modalSymbol').text('نماد: ' + currentSymbol);
+        
+        // Reset timeframe buttons
+        $('.btn[data-timeframe]').removeClass('active');
+        $('.btn[data-timeframe="1h"]').addClass('active');
+        currentTimeframe = '1h';
+        
+        // Show the modal
+        const marketModal = new bootstrap.Modal(document.getElementById('marketDataModal'));
+        marketModal.show();
+        
+        // Load market data
+        loadMarketData();
+    });
+    
+    // Timeframe selection
+    $('.btn[data-timeframe]').click(function() {
+        $('.btn[data-timeframe]').removeClass('active');
+        $(this).addClass('active');
+        currentTimeframe = $(this).data('timeframe');
+        loadMarketData();
+    });
+    
+    // Load market data
+    function loadMarketData() {
+        if (!currentSymbol) return;
+        
+        // Show loading state
+        if (marketChart) {
+            marketChart.destroy();
+        }
+        
+        // Make AJAX request to get market data
+        $.ajax({
+            url: `/api/market_data/${currentSymbol}`,
+            type: 'GET',
+            data: {
+                timeframe: currentTimeframe,
+                limit: 100
+            },
+            success: function(response) {
+                if (response.success) {
+                    updateMarketChart(response.data);
+                    updateMarketInfo(response.data);
+                } else {
+                    alert('خطا در دریافت داده‌های بازار: ' + response.error);
+                }
+            },
+            error: function(xhr, status, error) {
+                alert('خطا در دریافت داده‌های بازار: ' + error);
+            }
+        });
+    }
+    
+    // Update market chart
+    function updateMarketChart(data) {
+        const ctx = document.getElementById('marketChart').getContext('2d');
+        
+        // Prepare data for chart
+        const labels = data.map(item => item.datetime);
+        const prices = data.map(item => item.close);
+        
+        marketChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: currentSymbol + ' - قیمت بسته شدن',
+                    data: prices,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    }
+    
+    // Update market info
+    function updateMarketInfo(data) {
+        // Get the most recent data point
+        const latest = data[data.length - 1];
+        
+        // Calculate 24h change
+        const prev24h = data.find(item => new Date(item.datetime) <= new Date(Date.now() - 24 * 60 * 60 * 1000));
+        const change = prev24h ? ((latest.close - prev24h.close) / prev24h.close * 100) : 0;
+        
+        // Find high and low in the last 24 hours
+        const last24h = data.filter(item => new Date(item.datetime) >= new Date(Date.now() - 24 * 60 * 60 * 1000));
+        const high24h = Math.max(...last24h.map(item => item.high));
+        const low24h = Math.min(...last24h.map(item => item.low));
+        
+        // Calculate volume
+        const volume24h = last24h.reduce((sum, item) => sum + item.volume, 0);
+        
+        // Update the UI
+        $('#lastPrice').text(latest.close.toFixed(8));
+        $('#change24h').text(change.toFixed(2) + '%');
+        $('#change24h').removeClass().addClass(change >= 0 ? 'text-success' : 'text-danger');
+        $('#high24h').text(high24h.toFixed(8));
+        $('#low24h').text(low24h.toFixed(8));
+        $('#volume24h').text(volume24h.toFixed(2));
+        $('#tradesCount').text(last24h.length);
+    }
+</script>
+{% endblock %}

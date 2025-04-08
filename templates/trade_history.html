@@ -1,0 +1,292 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1>تاریخچه معاملات</h1>
+        <p class="text-muted">سوابق معاملات انجام شده توسط ربات</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Trade statistics -->
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">کل معاملات</h5>
+                <p class="card-text display-4">{{ trades|length }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">خریدها</h5>
+                <p class="card-text display-4 text-success">
+                    {{ trades|selectattr('order_type', 'equalto', 'BUY')|list|length }}
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">فروش‌ها</h5>
+                <p class="card-text display-4 text-danger">
+                    {{ trades|selectattr('order_type', 'equalto', 'SELL')|list|length }}
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">حجم کل (تقریبی)</h5>
+                <p class="card-text display-4">
+                    <!-- Calculate total volume in USD -->
+                    {% set total_volume = namespace(value=0) %}
+                    {% for trade in trades %}
+                        {% set total_volume.value = total_volume.value + (trade.amount * trade.price) %}
+                    {% endfor %}
+                    ${{ "%.2f"|format(total_volume.value) }}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Trade history chart -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                نمودار معاملات
+            </div>
+            <div class="card-body">
+                <canvas id="tradesChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Trade history table -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>سوابق معاملات</div>
+                    <div>
+                        <select class="form-select form-select-sm" id="filterTrades">
+                            <option value="all">همه معاملات</option>
+                            <option value="BUY">فقط خریدها</option>
+                            <option value="SELL">فقط فروش‌ها</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if trades %}
+                <div class="table-responsive">
+                    <table class="table table-hover" id="tradesTable">
+                        <thead>
+                            <tr>
+                                <th>زمان</th>
+                                <th>جفت ارزی</th>
+                                <th>نوع</th>
+                                <th>قیمت</th>
+                                <th>مقدار</th>
+                                <th>ارزش کل</th>
+                                <th>استراتژی</th>
+                                <th>وضعیت</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for trade in trades %}
+                            <tr data-type="{{ trade.order_type }}">
+                                <td>{{ trade.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>{{ trade.trading_pair.symbol }}</td>
+                                <td>
+                                    {% if trade.order_type == 'BUY' %}
+                                    <span class="badge bg-success">خرید</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">فروش</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ "%.4f"|format(trade.price) }}</td>
+                                <td>{{ "%.6f"|format(trade.amount) }}</td>
+                                <td>{{ "%.2f"|format(trade.price * trade.amount) }}</td>
+                                <td>{{ trade.strategy.name }}</td>
+                                <td>
+                                    {% if trade.status == 'FILLED' %}
+                                    <span class="badge bg-success">تکمیل شده</span>
+                                    {% elif trade.status == 'OPEN' %}
+                                    <span class="badge bg-warning">باز</span>
+                                    {% elif trade.status == 'CANCELLED' %}
+                                    <span class="badge bg-danger">لغو شده</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ trade.status }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center my-4">تاریخچه معاملات خالی است</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Filter trades based on type
+    $('#filterTrades').change(function() {
+        const filter = $(this).val();
+        
+        if (filter === 'all') {
+            $('#tradesTable tbody tr').show();
+        } else {
+            $('#tradesTable tbody tr').hide();
+            $('#tradesTable tbody tr[data-type="' + filter + '"]').show();
+        }
+    });
+
+    // Initialize trade history chart
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('tradesChart').getContext('2d');
+        
+        // Process trade data for chart
+        {% if trades %}
+        const trades = {{ trades|tojson }};
+        const labels = [];
+        const buyData = [];
+        const sellData = [];
+        
+        // Group trades by date
+        const tradeDates = {};
+        const dates = [];
+        
+        for (const trade of trades) {
+            const date = new Date(trade.created_at).toISOString().split('T')[0];
+            
+            if (!tradeDates[date]) {
+                tradeDates[date] = { buy: 0, sell: 0 };
+                dates.push(date);
+            }
+            
+            if (trade.order_type === 'BUY') {
+                tradeDates[date].buy += 1;
+            } else if (trade.order_type === 'SELL') {
+                tradeDates[date].sell += 1;
+            }
+        }
+        
+        // Sort dates
+        dates.sort();
+        
+        // Create chart data
+        for (const date of dates) {
+            labels.push(date);
+            buyData.push(tradeDates[date].buy);
+            sellData.push(tradeDates[date].sell);
+        }
+        
+        // Create chart
+        const tradesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'خرید',
+                        data: buyData,
+                        backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'فروش',
+                        data: sellData,
+                        backgroundColor: 'rgba(220, 53, 69, 0.6)',
+                        borderColor: 'rgba(220, 53, 69, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true,
+                        title: {
+                            display: true,
+                            text: 'تاریخ'
+                        }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'تعداد معاملات'
+                        },
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+        {% else %}
+        // Create empty chart if no trades
+        const tradesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'خرید',
+                        data: [],
+                        backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                        borderColor: 'rgba(40, 167, 69, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'فروش',
+                        data: [],
+                        backgroundColor: 'rgba(220, 53, 69, 0.6)',
+                        borderColor: 'rgba(220, 53, 69, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'تاریخ'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'تعداد معاملات'
+                        }
+                    }
+                }
+            }
+        });
+        {% endif %}
+    });
+</script>
+{% endblock %}

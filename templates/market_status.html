@@ -1,0 +1,248 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1>وضعیت بازار</h1>
+        <p class="text-muted">قیمت‌های لحظه‌ای و شاخص‌های بازار ارزهای دیجیتال</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Market ticker cards for popular coins -->
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title mb-0">BTC/USDT</h5>
+                        <small class="text-muted">بیت‌کوین</small>
+                    </div>
+                    <div class="text-end">
+                        <h5 class="mb-0" id="btc-price"><div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">در حال بارگذاری...</span></div></h5>
+                        <small class="text-muted" id="btc-change">-</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title mb-0">ETH/USDT</h5>
+                        <small class="text-muted">اتریوم</small>
+                    </div>
+                    <div class="text-end">
+                        <h5 class="mb-0" id="eth-price"><div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">در حال بارگذاری...</span></div></h5>
+                        <small class="text-muted" id="eth-change">-</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title mb-0">SOL/USDT</h5>
+                        <small class="text-muted">سولانا</small>
+                    </div>
+                    <div class="text-end">
+                        <h5 class="mb-0" id="sol-price"><div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">در حال بارگذاری...</span></div></h5>
+                        <small class="text-muted" id="sol-change">-</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title mb-0">XRP/USDT</h5>
+                        <small class="text-muted">ریپل</small>
+                    </div>
+                    <div class="text-end">
+                        <h5 class="mb-0" id="xrp-price"><div class="spinner-border spinner-border-sm text-primary" role="status"><span class="visually-hidden">در حال بارگذاری...</span></div></h5>
+                        <small class="text-muted" id="xrp-change">-</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Market data table -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                جفت‌های ارزی فعال
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>نماد</th>
+                                <th>آخرین قیمت</th>
+                                <th>تغییر 24 ساعته</th>
+                                <th>بالاترین قیمت</th>
+                                <th>پایین‌ترین قیمت</th>
+                                <th>حجم معاملات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="market-data-tbody">
+                            <tr>
+                                <td colspan="6" class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">در حال بارگذاری...</span></div></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Last Update Status -->
+<div class="row mt-3">
+    <div class="col-12 text-end">
+        <small class="text-muted">آخرین به‌روزرسانی: <span id="last-update-time">-</span></small>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let livePricesInterval;
+    
+    // Format price based on its magnitude
+    function formatPrice(price) {
+        if (typeof price !== 'number') return price;
+        
+        if (price > 1000) {
+            return price.toLocaleString('en-US', {maximumFractionDigits: 2});
+        } else if (price > 100) {
+            return price.toFixed(2);
+        } else if (price > 1) {
+            return price.toFixed(4);
+        } else if (price > 0.01) {
+            return price.toFixed(6);
+        } else {
+            return price.toFixed(8);
+        }
+    }
+    
+    // Format change percentage
+    function formatChange(change) {
+        if (typeof change !== 'number') return change;
+        return (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+    }
+    
+    // Function to get CSS class for change values
+    function getChangeClass(change) {
+        if (typeof change !== 'number') return 'text-muted';
+        return change >= 0 ? 'text-success' : 'text-danger';
+    }
+    
+    // Function to fetch and update live prices
+    function updateLivePrices() {
+        fetch('/api/live_prices')
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    const data = result.data;
+                    
+                    // Update featured price cards
+                    updatePriceCard('btc', data['BTC/USDT']);
+                    updatePriceCard('eth', data['ETH/USDT']);
+                    updatePriceCard('sol', data['SOL/USDT']);
+                    updatePriceCard('xrp', data['XRP/USDT']);
+                    
+                    // Update market data table
+                    updateMarketTable(data);
+                    
+                    // Update last update time
+                    document.getElementById('last-update-time').textContent = new Date().toLocaleTimeString();
+                } else {
+                    console.error('Failed to load live prices:', result.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching live prices:', error);
+            });
+    }
+    
+    // Function to update a price card with real data
+    function updatePriceCard(id, data) {
+        if (!data) return;
+        
+        const priceEl = document.getElementById(`${id}-price`);
+        const changeEl = document.getElementById(`${id}-change`);
+        
+        // Update with real data
+        if (priceEl && data.price !== undefined) {
+            priceEl.textContent = formatPrice(data.price);
+        }
+        
+        if (changeEl && data.change !== undefined) {
+            changeEl.textContent = formatChange(data.change);
+            changeEl.className = getChangeClass(data.change);
+        }
+    }
+    
+    // Function to update market data table
+    function updateMarketTable(data) {
+        const tbody = document.getElementById('market-data-tbody');
+        if (!tbody) return;
+        
+        // Clear existing rows
+        tbody.innerHTML = '';
+        
+        // No data case
+        if (Object.keys(data).length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="6" class="text-center">داده‌ای برای نمایش وجود ندارد</td>`;
+            tbody.appendChild(row);
+            return;
+        }
+        
+        // Add rows for each trading pair
+        for (const [symbol, priceData] of Object.entries(data)) {
+            const row = document.createElement('tr');
+            
+            // Create cell content
+            row.innerHTML = `
+                <td>${symbol}</td>
+                <td>${formatPrice(priceData.price)}</td>
+                <td class="${getChangeClass(priceData.change)}">${formatChange(priceData.change)}</td>
+                <td>${formatPrice(priceData.high)}</td>
+                <td>${formatPrice(priceData.low)}</td>
+                <td>${priceData.volume}</td>
+            `;
+            
+            tbody.appendChild(row);
+        }
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initial data load
+        updateLivePrices();
+        
+        // Set up recurring updates for live prices (every 5 seconds)
+        livePricesInterval = setInterval(updateLivePrices, 5000);
+    });
+    
+    // Clean up on page leave
+    window.addEventListener('beforeunload', function() {
+        if (livePricesInterval) {
+            clearInterval(livePricesInterval);
+        }
+    });
+</script>
+{% endblock %}

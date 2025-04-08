@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 text-center">
+        <div class="card">
+            <div class="card-body">
+                <h1 class="display-1 mb-4">500</h1>
+                <h2 class="mb-4">خطای داخلی سرور</h2>
+                <p class="lead">متأسفانه خطایی در سرور رخ داده است. لطفاً بعداً دوباره تلاش کنید.</p>
+                <hr>
+                <p>اگر این مشکل ادامه داشت، لطفاً با پشتیبانی تماس بگیرید.</p>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">
+                    <i class="fas fa-home me-2"></i> بازگشت به صفحه اصلی
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
